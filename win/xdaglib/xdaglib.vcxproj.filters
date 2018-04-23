@@ -40,6 +40,12 @@
     <Filter Include="client\utils">
       <UniqueIdentifier>{71f09615-b936-42fb-b99c-61c593b206be}</UniqueIdentifier>
     </Filter>
+    <Filter Include="client\json-rpc">
+      <UniqueIdentifier>{5c470121-b197-4756-93e8-4d7bb0d55185}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="client\uthash">
+      <UniqueIdentifier>{045ecca6-4308-47a2-bf89-229740ba9751}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\client\address.c">
@@ -149,6 +155,21 @@
     </ClCompile>
     <ClCompile Include="..\..\client\utils\utils.c">
       <Filter>client\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\json-rpc\cJSON.c">
+      <Filter>client\json-rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\json-rpc\cJSON_Utils.c">
+      <Filter>client\json-rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\json-rpc\rpc_procedures.c">
+      <Filter>client\json-rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\json-rpc\rpc_service.c">
+      <Filter>client\json-rpc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\json-rpc\rpc_wrapper.c">
+      <Filter>client\json-rpc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -313,6 +334,27 @@
     </ClInclude>
     <ClInclude Include="..\..\client\utils\utils.h">
       <Filter>client\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\json-rpc\cJSON.h">
+      <Filter>client\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\json-rpc\cJSON_Utils.h">
+      <Filter>client\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\json-rpc\rpc_procedures.h">
+      <Filter>client\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\json-rpc\rpc_service.h">
+      <Filter>client\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\json-rpc\rpc_wrapper.h">
+      <Filter>client\json-rpc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\uthash\utlist.h">
+      <Filter>client\uthash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\uthash\uthash.h">
+      <Filter>client\uthash</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
