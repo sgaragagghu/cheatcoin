@@ -1,4 +1,4 @@
-/* dnet: crypt; T11.231-T13.806; $DVS:time$ */
+/* dnet: crypt; T11.231-T13.915; $DVS:time$ */
 
 #include <stdio.h>
 #include <string.h>
@@ -13,7 +13,6 @@
 #include "dnet_database.h"
 #include "dnet_crypt.h"
 #include "dnet_main.h"
-#include "../client/utils/utils.h"
 
 #define KEYFILE	    "dnet_key.dat"
 #define PWDLEN	    64
@@ -169,12 +168,12 @@ static int set_user_crypt(struct dfslib_string *pwd) {
 	return 0;
 }
 
-/* 
- * 1 - to encode data (data _ id, serial number data and size data measured in 32 - bit words)
- * 2 - decode
- * 3 - password and check it returns 0 on success
- * 4 - password and write print array data of length 16 bytes
- * 5 - to verify that the pattern in the data corresponds to the password
+/* выполнить действие с паролем пользователя:
+ * 1 - закодировать данные (data_id - порядковый номер данных, size - размер данных, измеряется в 32-битных словах)
+ * 2 - декодировать -//-
+ * 3 - ввести пароль и проверить его, возвращает 0 при успехе
+ * 4 - ввести пароль и записать его отпечаток в массив data длины 16 байт
+ * 5 - проверить, что отпечаток в массиве data соответствует паролю
  * 6 - setup callback function to input password, data is pointer to function 
  *     int (*)(const char *prompt, char *buf, unsigned size);
  */
@@ -224,7 +223,14 @@ int dnet_user_crypt_action(unsigned *data, unsigned long long data_id, unsigned 
 		case 5:
 			return memcmp(g_dnet_user_crypt->pwd, data, sizeof(g_dnet_user_crypt->pwd)) ? -1 : 0;
 		case 6:
-			g_input_password = (int(*)(const char *, char *, unsigned))(void *)data;
+			{
+			union {
+				void *d;
+				int (*f)(const char *, char *, unsigned);
+			} u;
+			u.d = data;
+			g_input_password = u.f;
+			}
 			return 0;
 		default: return -1;
 	}
@@ -241,9 +247,9 @@ int dnet_crypt_init(const char *version) {
     keys = g_dnet_keys;
     dfslib_random_init();
 	if (crc_init()) return 2;
-	f = xdag_open_file(KEYFILE, "rb");
+	f = fopen(KEYFILE, "rb");
     if (f) {
-        if (fread(keys, sizeof(struct dnet_keys), 1, f) != 1) xdag_close_file(f), f = 0;
+        if (fread(keys, sizeof(struct dnet_keys), 1, f) != 1) fclose(f), f = 0;
 		else {
 			g_keylen = dnet_detect_keylen(keys->pub.key, DNET_KEYLEN);
 			if (dnet_test_keys()) {
@@ -262,7 +268,7 @@ int dnet_crypt_init(const char *version) {
     if (!f) {
         char buf[256];
         struct dfslib_string str;
-		f = xdag_open_file(KEYFILE, "wb");
+		f = fopen(KEYFILE, "wb");
 		if (!f) return 3;
 #ifndef QDNET
         if (dnet_limited_version)
@@ -317,7 +323,7 @@ int dnet_crypt_init(const char *version) {
 		if (g_dnet_user_crypt) for (i = 0; i < (sizeof(struct dnet_keys) >> 9); ++i)
 			dfslib_uncrypt_sector(g_dnet_user_crypt, (uint32_t *)keys + 128 * i, ~(uint64_t)i);
 	}
-    xdag_close_file(f);
+    fclose(f);
 	if (!(host = dnet_add_host(&g_dnet_keys->pub, 0, 127 << 24 | 1, 0, DNET_ROUTE_LOCAL))) return 6;
 	version = strchr(version, '-');
 	if (version) dnet_set_host_version(host, version + 1);

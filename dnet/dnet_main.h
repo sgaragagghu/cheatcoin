@@ -1,4 +1,4 @@
-/* dnet: external interface; T13.011-T13.794; $DVS:time$ */
+/* dnet: external interface; T13.011-T13.925; $DVS:time$ */
 
 #ifndef DNET_MAIN_H_INCLUDED
 #define DNET_MAIN_H_INCLUDED
@@ -11,7 +11,7 @@ extern int dnet_init(int argc, char **argv);
 
 extern int dnet_generate_random_array(void *array, unsigned long size);
 
-extern int dnet_set_xdag_callback(int (*callback)(void *block, void *connection_from));
+extern int dnet_set_cheatcoin_callback(int (*callback)(void *block, void *connection_from));
 
 /* отправить блок по данному соединению или группе соединений в зависимости от ппраметра connection_to:
  * 0		 - по случайному соединению, возвращает то соединение, по которому был отправлен;
@@ -19,11 +19,13 @@ extern int dnet_set_xdag_callback(int (*callback)(void *block, void *connection_
  * нечётное	 - по всем соединениям, кроме (connection_to - 1);
  * чётное	 - по данному соединению;
  */
-extern void *dnet_send_xdag_packet(void *block, void *connection_to);
+extern void *dnet_send_cheatcoin_packet(void *block, void *connection_to);
 
 extern int dnet_execute_command(const char *cmd, void *fileout);
 
 extern int dnet_set_self_version(const char *version);
+
+extern int g_dnet_xdag_mode;
 
 /* возвращает не 0, если данное входящее соединение не разрешается открывать */
 extern int (*dnet_connection_open_check)(void *conn, uint32_t ip, uint16_t port);

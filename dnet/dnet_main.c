@@ -1,10 +1,11 @@
-/* dnet: main file; T11.231-T13.789; $DVS:time$ */
+/* dnet: main file; T11.231-T13.961; $DVS:time$ */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <ctype.h>
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <signal.h>
 #include <unistd.h>
@@ -19,11 +20,9 @@
 #include "dnet_command.h"
 #include "dnet_main.h"
 
-#if defined (__MACOS__) || defined (__APPLE__)
-#define SIGPOLL SIGIO
-#endif
-
 //#define NO_DNET_FORK
+
+int g_dnet_xdag_mode = 0;
 
 extern int getdtablesize(void);
 
@@ -74,7 +73,7 @@ static void daemonize(void) {
 
 static void angelize(void) {
 #if !defined(__LDuS__) && !defined(QDNET) && !defined(_WIN32) && !defined(_WIN64) && !defined(NO_DNET_FORK)
-    int stat = 0;
+    int stat;
     pid_t childpid;
 	while ((childpid = fork())) {
 		signal(SIGINT, SIG_IGN);
@@ -98,6 +97,53 @@ int dnet_init(int argc, char **argv) {
     struct dnet_thread *thread;
     int i = 0, err = 0, res, is_daemon = 0, is_server = 0;
     const char *mess = 0;
+	FILE *f = fopen("dnet_profile.txt", "r");
+
+	if (f) {
+		char **argv0 = malloc(argc * sizeof(char *)), *ptr;
+		if (!argv0) return 2;
+		memcpy(argv0, argv, argc * sizeof(char *));
+		argv = argv0;
+		while ((ptr = fgets(command, DNET_COMMAND_MAX, f))) {
+			while (*ptr && isspace((uint8_t)*ptr)) ++ptr;
+			while (*ptr && isspace((uint8_t)ptr[strlen(ptr) - 1])) ptr[strlen(ptr) - 1] = 0;
+			if (!*ptr) continue;
+			ptr = strdup(ptr);
+			if (!ptr) return 3;
+			argv = realloc(argv, (argc + 1) * sizeof(char *));
+			if (!argv) return 4;
+			argv[argc++] = ptr;
+		}
+		fclose(f);
+	}
+
+#if !defined(CHEATCOIN)
+	char *def_argv[5];
+	if (!g_dnet_xdag_mode) {
+		if (argc == 1) {
+			argc = 2;
+			def_argv[0] = argv[0];
+			def_argv[1] = (char *)"139.162.224.71:11231";
+			argv = def_argv;
+#ifndef QDNET
+			dnet_limited_version = 1;
+#endif
+		} else if (argc == 2 && !strcmp(argv[1], "-d")) {
+			argc = 5;
+			def_argv[0] = argv[0];
+			def_argv[1] = argv[1];
+			def_argv[2] = "-s";
+			def_argv[3] = (char *)"0.0.0.0:11231";
+			def_argv[4] = (char *)"139.162.224.71:11231";
+			argv = def_argv;
+		}
+
+		if (argc <= 1 || (argv[1][0] == '-' && argv[1][1] != 'd' && argv[1][1] != 's')) {
+			printf("Usage: %s [-d] [-s our_addr:our_port] [remote_addr:remote_port...]\n", argv[0]);
+			return 1;
+		}
+	}
+#endif
 
     if (system_init() || dnet_threads_init() || dnet_hosts_init()) {
 		err = 4; mess = "initializing error"; goto end;
@@ -110,8 +156,17 @@ int dnet_init(int argc, char **argv) {
 #endif
 			printf("%s %s%s.\n", argv[0], DNET_VERSION, (is_daemon ? ", running as daemon" : ""));
 			if ((err = dnet_crypt_init(DNET_VERSION))) {
-				sleep(3); printf("Password incorrect.\n");
-				return err;
+#if !defined(CHEATCOIN)
+				if (!g_dnet_xdag_mode) {
+					err *= 10;
+					if (err < 0) mess = "private and public keys do not match, running in blind mode";
+					goto end;
+				} else
+#endif
+				{
+					sleep(3); printf("Password incorrect.\n");
+					return err;
+				}
 			}
 		work:
 			if (is_daemon) daemonize();
@@ -156,10 +211,21 @@ int dnet_init(int argc, char **argv) {
 			}
 			strcpy(command, argv[i++]);
 		} else if (is_daemon) {
-			return 0;
-
+#if !defined(CHEATCOIN)
+			if (!g_dnet_xdag_mode) {
+				sleep(100);
+				continue;
+			} else
+#endif
+				return 0;
 		} else {
-            return 0;
+#if !defined(QDNET) && !defined(CHEATCOIN)
+			if (!g_dnet_xdag_mode) {
+				printf("dnet> "); fflush(stdout);
+				fgets(command, DNET_COMMAND_MAX, stdin);
+			} else
+#endif
+				return 0;
 		}
     	if (dnet_command(command, &out) < 0) break;
     }
@@ -173,3 +239,9 @@ end:
     }
     exit(err);
 }
+
+#if !defined(QDNET) && !defined(CHEATCOIN)
+int main(int argc, char **argv) {
+	return dnet_init(argc, argv);
+}
+#endif
