@@ -1,4 +1,4 @@
-/* dnet: database; T11.231-T13.808; $DVS:time$ */
+/* dnet: database; T11.231-T13.915; $DVS:time$ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,7 +10,6 @@
 #include "../dus/programs/dar/source/include/crc.h"
 #include "dnet_database.h"
 #include "dnet_main.h"
-#include "../client/utils/utils.h"
 
 #define DNET_HOST_MAX           0x1000
 #define DNET_NEW_HOST_TIMEOUT	DNET_ACTIVE_PERIOD
@@ -67,16 +66,16 @@ begin:
 	host->route_port = route_port;
 	host->route_type = route_type;
 	if (!n) {
-		FILE *f = xdag_open_file(NAME_FILE, "rb");
+		FILE *f = fopen(NAME_FILE, "rb");
 		if (f) {
 			int len = fread(host->name, 1, DNET_HOST_NAME_MAX, f);
-			xdag_close_file(f);
+			fclose(f);
 			if (len > 0) host->name_len = len;
 		}
 		host->is_local = 1;
 		host->is_trusted = 1;
 	} else {
-		FILE *f = xdag_open_file(KEYS_FILE, "rb");
+		FILE *f = fopen(KEYS_FILE, "rb");
 		if (!f) host->is_trusted = 1;
 		else {
 			struct dnet_key k;
@@ -86,7 +85,7 @@ begin:
 					break;
 				}
 			}
-			xdag_close_file(f);
+			fclose(f);
 		}
 	}
 	g_dnet_n_hosts++;
@@ -176,28 +175,54 @@ int dnet_trust_host(struct dnet_host *host) {
 	FILE *f;
     unsigned i;
 	if (host == &g_dnet_hosts[0]) return 0;
-	if (!(f = xdag_open_file(KEYS_FILE, "rb"))) {
-		f = xdag_open_file(KEYS_FILE, "wb");
+	if (!(f = fopen(KEYS_FILE, "rb"))) {
+		f = fopen(KEYS_FILE, "wb");
 		if (!f) return 1;
 		for (i = 1; i < g_dnet_n_hosts; ++i) {
 			g_dnet_hosts[i].is_trusted = 0;
 		}
 	}
-	xdag_close_file(f);
+	fclose(f);
 	if (host->is_trusted) return 0;
-	f = xdag_open_file(KEYS_FILE, "ab");
+	f = fopen(KEYS_FILE, "ab");
 	if (!f) return 2;
 	if (fwrite(&host->key, sizeof(struct dnet_key), 1, f) != 1) {
-		xdag_close_file(f);
+		fclose(f);
 		return 3;
 	}
-	xdag_close_file(f);
+	fclose(f);
 	host->is_trusted = 1;
 	return 0;
 }
 
 int dnet_untrust_host(struct dnet_host *host) {
+#ifndef CHEATCOIN
+	struct dnet_key key;
+	FILE *f;
+	int res = 10;
+	host->is_trusted = 0;
+	if (!(f = fopen(KEYS_FILE, "r+b"))) return 3;
+	while (fread(&key, sizeof(struct dnet_key), 1, f) == 1) {
+		if (!memcmp(&key, &host->key, sizeof(struct dnet_key))) {
+			long pos = ftell(f) - sizeof(struct dnet_key), endpos;
+			if (fseek(f, -(long)sizeof(struct dnet_key), SEEK_END) < 0) { res = 4; break; }
+			endpos = ftell(f);
+			if (endpos < 0) { res = 5; break; }
+			if (pos != endpos) {
+				if (fread(&key, sizeof(struct dnet_key), 1, f) != 1) { res = 6; break; }
+				if (fseek(f, pos, SEEK_SET) < 0) { res = 7; break; }
+				if (fwrite(&key, sizeof(struct dnet_key), 1, f) != 1) { res = 8; break; }
+			}
+			if (ftruncate(fileno(f), endpos)) res = 9;
+			else res = 0;
+			break;
+		}
+	}
+	fclose(f);
+	return res;
+#else
 	return -1;
+#endif
 }
 
 int dnet_set_host_name(struct dnet_host *host, const char *name, size_t len) {
@@ -211,10 +236,10 @@ int dnet_set_host_name(struct dnet_host *host, const char *name, size_t len) {
     memcpy(host->name, name, len);
     host->name_len = len;
 	if (host == g_dnet_hosts) {
-		FILE *f = xdag_open_file(NAME_FILE, "wb");
+		FILE *f = fopen(NAME_FILE, "wb");
 		if (f) {
 			fwrite(host->name, 1, host->name_len, f);
-			xdag_close_file(f);
+			fclose(f);
 		}
 	}
 	return 0;
