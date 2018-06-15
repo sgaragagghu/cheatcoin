@@ -38,6 +38,7 @@
 #define EXPENSIVE_RAM			1
 #define OPENSSL				0
 #define TEST_OPENSSL_VS_SECP256K1	0
+#define SKIP_HIGH_HASH_BLOCKS	1
 
 enum bi_flags {
 	BI_MAIN         = 0x01,
@@ -483,10 +484,18 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			if (keyNumber >= 0) {
 				verified_keys_mask |= 1 << keyNumber;
 			}
+#if SKIP_HIGH_HASH_BLOCKS == 1
+if(!(tmpNodeBlock.hash[3] & 0x8888000000000000)){
+	//printf("hash \n %lu   \n", tmpNodeBlock.hash[3] /*xdag_log_array(tmpNodeBlock.hash,256)*/ );
+	//fflush(stdout);
+#endif
 			if (1 << i & signoutmask && !(tmpNodeBlock.flags & BI_OURS) && (keyNumber = valid_signature(newBlock, i, ourKeysCount, our_keys)) >= 0) {
 				tmpNodeBlock.flags |= BI_OURS;
 				tmpNodeBlock.n_our_key = keyNumber;
 			}
+#if SKIP_HIGH_HASH_BLOCKS == 1
+}
+#endif
 		}
 	}
 
