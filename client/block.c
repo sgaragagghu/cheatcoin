@@ -83,10 +83,15 @@ struct cache_block {
 	struct cache_block *next;
 };
 
+struct orphan_block {
+        struct ldus_rbtree node;
+        xdag_hash_t hash;
+        struct block_internal *bi;
+};
 
 static xdag_amount_t g_balance = 0;
 static xdag_time_t time_limit = DEF_TIME_LIMIT, xdag_era = XDAG_MAIN_ERA;
-static struct ldus_rbtree *root = 0, *cache_root = 0;
+static struct ldus_rbtree *root = 0, *cache_root = 0, *orphans_root = 0;
 static struct block_internal *volatile top_main_chain = 0, *volatile pretop_main_chain = 0;
 static struct block_internal *ourfirst = 0, *ourlast = 0, *noref_first = 0, *noref_last = 0;
 static struct cache_block *cache_first = NULL, *cache_last = NULL;
@@ -120,6 +125,12 @@ static inline struct block_internal *block_by_hash(const xdag_hashlow_t hash)
 {
 	return (struct block_internal *)ldus_rbtree_find(root, (struct ldus_rbtree *)hash - 1);
 }
+
+static inline struct orphan_block *orphans_block_by_hash(const xdag_hashlow_t hash)
+{
+        return (struct orphan_block *)ldus_rbtree_find(orphans_root, (struct ldus_rbtree *)hash - 1);
+}
+
 
 static inline struct cache_block *cache_block_by_hash(const xdag_hashlow_t hash)
 {
@@ -773,6 +784,7 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 
 	for (i = 0; i < tmpNodeBlock.nlinks; ++i) {
 		if (!(tmpNodeBlock.link[i]->flags & BI_REF)) {
+/*
 			for (blockRef0 = 0, blockRef = noref_first; blockRef != tmpNodeBlock.link[i]; blockRef0 = blockRef, blockRef = blockRef->ref) {
 				;
 			}
@@ -783,7 +795,22 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 				noref_last = blockRef0;
 			}
 
-			blockRef->ref = 0;
+*/		//	struct block_internal* bi = orphans_block_by_hash((tmpNodeBlock.link[i])->hash);
+		//	if(bi == NULL){
+		//		printf("WARNING");
+		//		fflush(stdout);
+		//	}
+
+		struct orphan_block* ob = orphans_block_by_hash((tmpNodeBlock.link[i])->hash);
+                        if(ob == NULL){
+                                printf("WARNING");
+                                fflush(stdout);
+                        }
+
+			//blockRef->ref = 0;
+			(ob->bi)->ref = 0; // why?
+		        ldus_rbtree_remove(&orphans_root,&ob->node);
+			free(ob);
 			tmpNodeBlock.link[i]->flags |= BI_REF;
 			g_xdag_extstats.nnoref--;
 		}
@@ -803,9 +830,20 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			blockRef->backrefs->backrefs[j] = nodeBlock;
 		}
 	}
-
+/*
 	*(noref_last ? &noref_last->ref : &noref_first) = nodeBlock;
 	noref_last = nodeBlock;
+*/
+	struct orphan_block *ob = malloc(sizeof(struct orphan_block));
+	memcpy(&(ob->hash), nodeBlock->hash, sizeof(xdag_hash_t));
+	ob->bi=nodeBlock;
+        ldus_rbtree_insert(&orphans_root, &ob->node);/*
+                        struct orphan_block* ob2 = orphans_block_by_hash(nodeBlock->hash);
+                        if(ob2 == NULL){
+                                printf("WARNING");
+                                fflush(stdout);
+                        }
+*/
 	g_xdag_extstats.nnoref++;
 	
 	log_block((tmpNodeBlock.flags & BI_OURS ? "Good +" : "Good  "), tmpNodeBlock.hash, tmpNodeBlock.time, tmpNodeBlock.storage_pos);
