@@ -169,11 +169,11 @@ begin:
 
 /* initialized block synchronization */
 int xdag_sync_init(void)
-{
+{	// calloc is just malloc + memset 0
 	g_sync_hash = (struct sync_block **)calloc(sizeof(struct sync_block *), SYNC_HASH_SIZE);
 	g_sync_hash_r = (struct sync_block **)calloc(sizeof(struct sync_block *), SYNC_HASH_SIZE);
 
-	if (!g_sync_hash || !g_sync_hash_r) return -1;
+	if (!g_sync_hash || !g_sync_hash_r) return -1; 	// error check
 
 	return 0;
 }
