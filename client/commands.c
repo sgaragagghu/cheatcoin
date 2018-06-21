@@ -54,9 +54,12 @@ void processMiningCommand(char *nextParam, FILE *out);
 void processNetCommand(char *nextParam, FILE *out);
 void processPoolCommand(char *nextParam, FILE *out);
 void processStatsCommand(FILE *out);
+void processCacheCommand(FILE *out);
 void processExitCommand(void);
 void processXferCommand(char *nextParam, FILE *out, int ispwd, uint32_t* pwd);
 void processLastBlocksCommand(char *nextParam, FILE *out);
+void processMainBlocksCommand(char *nextParam, FILE *out);
+void processMinedBlocksCommand(char *nextParam, FILE *out);
 void processMinersCommand(char *nextParam, FILE *out);
 void processHelpCommand(FILE *out);
 void processDisconnectCommand(char *nextParam, FILE *out);
@@ -65,6 +68,8 @@ int xdag_com_account(char *, FILE*);
 int xdag_com_balance(char *, FILE*);
 int xdag_com_block(char *, FILE*);
 int xdag_com_lastblocks(char *, FILE*);
+int xdag_com_mainblocks(char *, FILE*);
+int xdag_com_minedblocks(char *, FILE*);
 int xdag_com_keyGen(char *, FILE*);
 int xdag_com_level(char *, FILE*);
 int xdag_com_mining(char *, FILE*);
@@ -73,6 +78,7 @@ int xdag_com_pool(char *, FILE*);
 int xdag_com_miners(char *, FILE*);
 int xdag_com_stats(char *, FILE*);
 int xdag_com_state(char *, FILE*);
+int xdag_com_cache(char *, FILE*);
 int xdag_com_help(char *, FILE*);
 int xdag_com_run(char *, FILE*);
 int xdag_com_terminate(char *, FILE*);
@@ -87,6 +93,8 @@ XDAG_COMMAND commands[] = {
 	{ "balance"    , xdag_com_balance },
 	{ "block"      , xdag_com_block },
 	{ "lastblocks" , xdag_com_lastblocks },
+	{ "mainblocks" , xdag_com_mainblocks },
+	{ "minedblocks", xdag_com_minedblocks },
 	{ "keyGen"     , xdag_com_keyGen },
 	{ "level"      , xdag_com_level },
 	{ "miners"     , xdag_com_miners },
@@ -96,6 +104,7 @@ XDAG_COMMAND commands[] = {
 	{ "run"        , xdag_com_run },
 	{ "state"      , xdag_com_state },
 	{ "stats"      , xdag_com_stats },
+	{ "cache"      , xdag_com_cache },
 	{ "terminate"  , xdag_com_terminate },
 	{ "exit"       , xdag_com_exit },
 	{ "xfer"       ,(xdag_com_func_t)NULL},
@@ -125,6 +134,18 @@ int xdag_com_block(char * args, FILE* out)
 int xdag_com_lastblocks(char * args, FILE* out)
 {
 	processLastBlocksCommand(args, out);
+	return 0;
+}
+
+int xdag_com_mainblocks(char * args, FILE* out)
+{
+	processMainBlocksCommand(args, out);
+	return 0;
+}
+
+int xdag_com_minedblocks(char * args, FILE* out)
+{
+	processMinedBlocksCommand(args, out);
 	return 0;
 }
 
@@ -175,6 +196,13 @@ int xdag_com_state(char * args, FILE* out)
 	fprintf(out, "%s\n", get_state());
 	return 0;
 }
+
+int xdag_com_cache(char * args, FILE* out)
+{
+	processCacheCommand(out);
+	return 0;
+}
+
 
 int xdag_com_run(char * args, FILE* out)
 {
@@ -372,7 +400,7 @@ void processMiningCommand(char *nextParam, FILE *out)
 	} else if(sscanf(cmd, "%d", &nthreads) != 1 || nthreads < 0) {
 		fprintf(out, "Illegal number.\n");
 	} else {
-		xdag_mining_start(g_is_miner ? ~nthreads : nthreads);
+		xdag_mining_start(nthreads);
 		fprintf(out, "%d mining threads running\n", g_xdag_mining_threads);
 	}
 }
@@ -442,6 +470,15 @@ void processStatsCommand(FILE *out)
 	}
 }
 
+void processCacheCommand(FILE *out)
+{
+	fprintf(out, "Cache informations:\n"
+		"     cached blocks: target amount %u, actual amount %u, hitrate %f%%\n",
+		g_xdag_extstats.cache_size, g_xdag_extstats.cache_usage, g_xdag_extstats.cache_hitrate*100
+	);
+}
+
+
 void processExitCommand()
 {
 	xdag_wallet_finish();
@@ -477,16 +514,29 @@ void processLastBlocksCommand(char *nextParam, FILE *out)
 	if((cmd && sscanf(cmd, "%d", &blocksCount) != 1) || blocksCount <= 0) { //parse string, is it a number?
 		fprintf(out, "Illegal number.\n");
 	} else {
-		//100 is limit
-		if(blocksCount > 100) {
-			blocksCount = 100;
-		}
-		char** addressList = xdagCreateStringArray(blocksCount, 40);	//lets assume max address length as 39 symbols + null terminator
-		const int retrievedBlocks = xdagGetLastMainBlocks(blocksCount, addressList);
-		for(int i = 0; i < retrievedBlocks; ++i) {
-			fprintf(out, "%s\n", addressList[i]);
-		}
-		xdagFreeStringArray(addressList, blocksCount);
+		xdag_list_main_blocks(blocksCount, 1, out);
+	}
+}
+
+void processMainBlocksCommand(char *nextParam, FILE *out)
+{
+	int blocksCount = 20;
+	char *cmd = strtok_r(nextParam, " \t\r\n", &nextParam);
+	if((cmd && sscanf(cmd, "%d", &blocksCount) != 1) || blocksCount <= 0) {
+		fprintf(out, "Illegal number.\n");
+	} else {
+		xdag_list_main_blocks(blocksCount, 0, out);
+	}
+}
+
+void processMinedBlocksCommand(char *nextParam, FILE *out)
+{
+	int blocksCount = 20;
+	char *cmd = strtok_r(nextParam, " \t\r\n", &nextParam);
+	if((cmd && sscanf(cmd, "%d", &blocksCount) != 1) || blocksCount <= 0) {
+		fprintf(out, "Illegal number.\n");
+	} else {
+		xdag_list_mined_blocks(blocksCount, 0, out);
 	}
 }
 
@@ -524,6 +574,7 @@ void processDisconnectCommand(char *nextParam, FILE *out)
 	disconnect_connections(type, value);
 }
 
+
 static long double diff2log(xdag_diff_t diff)
 {
 	// it takes the 64 least significant bit
@@ -550,6 +601,11 @@ long double hashrate(xdag_diff_t *diff)
 	for(int i = 0; i < HASHRATE_LAST_MAX_TIME; ++i) {
 		sum += diff2log(diff[i]); // return log(diff1*2^64*diff2*2^64*diff2*2^64*.......)
 	}
+  /*
+	sum /= HASHRATE_LAST_MAX_TIME;
+	return ldexpl(expl(sum), -58); //shown pool and network hashrate seems to be around 35% higher than real, to consider *(0.65) about correction. Deeper study is needed.
+  
+  */
 	sum /= HASHRATE_LAST_MAX_TIME; // log(diff1*2^64*diff2*2^64*diff2*2^64*.......)/HASHRATE_LAST_MAX_TIME
 	// First expl: (diff1*2^64*diff2*2^64*diff2*2^64*.......)/e^HASHRATE_LAST_MAX_TIME
 	// (diff1*2^64*diff2*2^64*diff2*2^64*.......)/(e^HASHRATE_LAST_MAX_TIME*2^58)
@@ -676,7 +732,7 @@ int xfer_callback(void *data, xdag_hash_t hash, xdag_amount_t amount, xdag_time_
 	if(!amount) {
 		return -1;
 	}
-	if(!g_is_miner && xdag_main_time() < (time >> 16) + 2 * XDAG_POOL_CONFIRMATIONS_COUNT) {
+	if(!g_is_miner && xdag_main_time() < (time >> 16) + 2 * CONFIRMATIONS_COUNT) {
 		return 0;
 	}
 	for(i = 0; i < xferData->keysCount; ++i) {
@@ -835,7 +891,7 @@ void processHelpCommand(FILE *out)
 
 void xdagSetCountMiningTread(int miningThreadsCount)
 {
-	xdag_mining_start(~miningThreadsCount);
+	xdag_mining_start(miningThreadsCount);
 }
 
 double xdagGetHashRate(void)
