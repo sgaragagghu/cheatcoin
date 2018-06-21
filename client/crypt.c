@@ -335,12 +335,12 @@ static uint8_t *add_number_to_sign_noopenssl(uint8_t *sign, const xdag_hash_t nu
 
 	leadzero = (i < sizeof(xdag_hash_t) && n[i] & 0x80);
 	len = (sizeof(xdag_hash_t) - i) + leadzero;
-	*sign++ = 0x02;
-	if(len)
+	*sign++ = 0x02;		// <-- by standard it start by 2
+	if(len)				// if signature len is greater than 0 (so signature is not 0)
 		*sign++ = len;
-	else{
-		*sign++ = 1;
-		*sign++ = 0;
+	else{				//daniel code doesn't follow DER standard of ECDSA signature when signature is 0, he calculate length 0, that is clearly false
+		*sign++ = 1;		// <-- lenght (1)
+		*sign++ = 0;		// <--- signature 
 		return sign;
 	}
 	
@@ -387,7 +387,7 @@ int xdag_verify_signature_noopenssl(const void *key, const xdag_hash_t hash, con
         secp256k1_ecdsa_signature sig_noopenssl_normalized;
 	int res=0;
 
-	buf_pubkey[0]=2+((uintptr_t)key & 1);
+	buf_pubkey[0]=2+((uintptr_t)key & 1); // just the ecnode standard want that it start with 2 if even of 3 if odd.
 	memcpy(&(buf_pubkey[1]),(xdag_hash_t*)((uintptr_t)key & ~1l), sizeof(xdag_hash_t));
 
 
