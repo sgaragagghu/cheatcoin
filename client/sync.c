@@ -34,6 +34,7 @@ int g_xdag_sync_on = 0;
 
 
 // called only from this file
+// it is pushing sync block in this hashtable system
 static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 {
 	xdag_hash_t hash;
@@ -144,11 +145,11 @@ int xdag_sync_add_block(struct xdag_block *b, void *conn)
 			b->field[0].transport_header = ttl << 8;
 			xdag_send_packet(b, (void*)((uintptr_t)conn | 1l));
 		}
-	} else if (g_xdag_sync_on && ((res = -res) & 0xf) == 5) {
-		res = (res >> 4) & 0xf;
-		if (push_block(b, conn, res, ttl)) {
-			struct sync_block **p, *q;
-			uint64_t *hash = b->field[res].hash;
+	} else if (g_xdag_sync_on && ((res = -res) & 0xf) == 5) { // err from add_nolock is 5 (we are missing a block that have a link to the block we are trying to add)
+		res = (res >> 4) & 0xf; //res=15.
+		if (push_block(b, conn, res, ttl)) { // pushing in our hash table system that we had this issue from that block from that conn
+			struct sync_block **p, *q; //
+			uint64_t *hash = b->field[res].hash; // we know the missing block hash this way?
 			time_t t = time(0);
 
 			pthread_mutex_lock(&g_sync_hash_mutex);
