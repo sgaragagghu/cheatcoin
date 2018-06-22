@@ -45,7 +45,7 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	xdag_hash(b, sizeof(struct xdag_block), hash);
 	
 	pthread_mutex_lock(&g_sync_hash_mutex);
-
+		// check if block is already in list
 	for (p = get_list(b->field[nfield].hash), q = *p; q; q = q->next) {
 		if (!memcmp(&q->b, b, sizeof(struct xdag_block))) {
 			res = (t - q->t >= REQ_PERIOD);
@@ -53,12 +53,12 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 			q->conn = conn;
 			q->nfield = nfield;
 			q->ttl = ttl;
-			
+			// if expired it send how much time is it expired
 			if (res) q->t = t;
 			
 			pthread_mutex_unlock(&g_sync_hash_mutex);
 			
-			return res;
+			return res; // exit
 		}
 	}
 
@@ -68,8 +68,10 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	memcpy(&q->b, b, sizeof(struct xdag_block));
 	memcpy(&q->hash, hash, sizeof(xdag_hash_t));
 	
+	// adding to list and list_r
+	
 	q->conn = conn;
-	q->nfield = nfield;
+	q->nfield = nfield; // field where we have the needed block to accept this block
 	q->ttl = ttl;
 	q->t = t;
 	q->next = *p;
@@ -140,26 +142,29 @@ int xdag_sync_add_block(struct xdag_block *b, void *conn)
 
 	res = xdag_add_block(b); // if called from xdag_sync_pop_block it is trying to re-add the block a new time.. why?
 	if (res >= 0) {
+		// just remove this block from the listes...
 		xdag_sync_pop_block(b); // it recall back a new time xdag_sync_pop_block 
 		if (res > 0 && ttl > 2) {
 			b->field[0].transport_header = ttl << 8;
-			xdag_send_packet(b, (void*)((uintptr_t)conn | 1l));
+			xdag_send_packet(b, (void*)((uintptr_t)conn | 1l)); 
 		}
 	} else if (g_xdag_sync_on && ((res = -res) & 0xf) == 5) { // err from add_nolock is 5 (we are missing a block that have a link to the block we are trying to add)
-		res = (res >> 4) & 0xf; //res=15.
+		res = (res >> 4) & 0xf; //taking the field of the block that failed the check (the field contain the hash of the block that we need).
 		if (push_block(b, conn, res, ttl)) { // pushing in our hash table system that we had this issue from that block from that conn
+			// we enter if the block wasn't already pushed
 			struct sync_block **p, *q; //
-			uint64_t *hash = b->field[res].hash; // we know the missing block hash this way?
-			time_t t = time(0);
+			uint64_t *hash = b->field[res].hash; // we get the missing block hash this way
+			time_t t = time(0); // actual time
 
 			pthread_mutex_lock(&g_sync_hash_mutex);
  
 begin:
+			// searching if the block that we want ALREADY need another block !!!
 			for (p = get_list_r(hash); (q = *p); p = &q->next_r) {
 				if (!memcmp(hash, q->hash, sizeof(xdag_hashlow_t))) {
 					if (t - q->t < REQ_PERIOD) {
 						pthread_mutex_unlock(&g_sync_hash_mutex);
-						return 0;
+						return 0; // if already there and it didn't (expire?) exit 
 					}
 
 					q->t = t;
@@ -168,7 +173,8 @@ begin:
 					goto begin;
 				}
 			}
-
+				// if we got that we need a block with hash diffeerent than the block that we need,
+				// it means we need another block first!
 			pthread_mutex_unlock(&g_sync_hash_mutex);
 			
 			xdag_request_block(hash, (void*)(uintptr_t)1l); // requesting the block
