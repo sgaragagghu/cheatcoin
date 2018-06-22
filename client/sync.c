@@ -8,11 +8,11 @@
 #include "hash.h"
 #include "init.h"
 #include "transport.h"
-#include "utils/log.h"
+#include "utils/log.h"				// it is more an hashtable
 
-#define SYNC_HASH_SIZE      0x10000
-#define get_list(hash)      (g_sync_hash   + ((hash)[0] & (SYNC_HASH_SIZE - 1)))
-#define get_list_r(hash)    (g_sync_hash_r + ((hash)[0] & (SYNC_HASH_SIZE - 1)))
+#define SYNC_HASH_SIZE      0x10000		// list of block we have to sync
+#define get_list(hash)      (g_sync_hash   + ((hash)[0] & (SYNC_HASH_SIZE - 1))) // it takes the hash last 4 number(in hex, so last 16 binary number)
+#define get_list_r(hash)    (g_sync_hash_r + ((hash)[0] & (SYNC_HASH_SIZE - 1))) // list of block that refer or are referred (need to understand) 
 #define REQ_PERIOD          64
 
 struct sync_block {
@@ -84,21 +84,27 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 }
 
 /* notifies synchronization mechanism about found block */
+
+// this is called after a block is added in our dag
 int xdag_sync_pop_block(struct xdag_block *b)
 {
 	struct sync_block **p, *q, *r;
 	xdag_hash_t hash;
 
-	xdag_hash(b, sizeof(struct xdag_block), hash);
+	xdag_hash(b, sizeof(struct xdag_block), hash); // just hash of the block
  
 begin:
 	pthread_mutex_lock(&g_sync_hash_mutex);
-
-	for (p = get_list(hash); (q = *p); p = &q->next) {
-		if (!memcmp(hash, q->b.field[q->nfield].hash, sizeof(xdag_hashlow_t))) {
-			*p = q->next;
+	// getlist just give a pointer to a pointer to a sync block that (supposed) to have that hash
+	
+	
+	for (p = get_list(hash); (q = *p); p = &q->next) { // just exploring the list (of that hash...)
+		if (!memcmp(hash, q->b.field[q->nfield].hash, sizeof(xdag_hashlow_t))) { // enter if equal (we got the right sync block)
+			// just removing the sync block from the list
+			*p = q->next;	
 			g_xdag_extstats.nwaitsync--;
-
+			
+			// just removing that block from the r list
 			for (p = get_list_r(q->hash); (r = *p) && r != q; p = &r->next_r);
 				
 			if (r == q) {
@@ -121,13 +127,16 @@ begin:
 }
 
 /* checks a block and includes it in the database with synchronization, ruturs non-zero value in case of error */
+
+
+// this is called when a block from the network arrive
 int xdag_sync_add_block(struct xdag_block *b, void *conn)
 {
 	int res, ttl = b->field[0].transport_header >> 8 & 0xff;
 
-	res = xdag_add_block(b);
+	res = xdag_add_block(b); // if called from xdag_sync_pop_block it is trying to re-add the block a new time.. why?
 	if (res >= 0) {
-		xdag_sync_pop_block(b);
+		xdag_sync_pop_block(b); // it recall back a new time xdag_sync_pop_block 
 		if (res > 0 && ttl > 2) {
 			b->field[0].transport_header = ttl << 8;
 			xdag_send_packet(b, (void*)((uintptr_t)conn | 1l));
@@ -158,7 +167,7 @@ begin:
 
 			pthread_mutex_unlock(&g_sync_hash_mutex);
 			
-			xdag_request_block(hash, (void*)(uintptr_t)1l);
+			xdag_request_block(hash, (void*)(uintptr_t)1l); // requesting the block
 			
 			xdag_info("ReqBlk: %016llx%016llx%016llx%016llx", hash[3], hash[2], hash[1], hash[0]);
 		}
