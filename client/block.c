@@ -764,7 +764,7 @@ end:
 
 	if (err > 0) {
 		char buf[32];
-		err |= i << 4;
+		err |= i << 4; // adding the field that failed check! (for err5)
 		sprintf(buf, "Err %2x", err & 0xff);
 		log_block(buf, tmpNodeBlock.hash, tmpNodeBlock.time, transportHeader);
 	}
