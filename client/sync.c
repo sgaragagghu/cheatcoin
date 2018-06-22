@@ -31,6 +31,9 @@ int g_xdag_sync_on = 0;
 
 /* moves the block to the wait list, block with hash written to field 'nfield' of block 'b' is expected 
  (original russian comment was unclear too) */
+
+
+// called only from this file
 static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 {
 	xdag_hash_t hash;
