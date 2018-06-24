@@ -77,10 +77,10 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	q->t = t;
 	q->next = *p; // the next is the needed block ..!
 	
-	*p = q;
+	*p = q; // why = maybe just to initialize?
 	p = get_list_r(hash); // hash of the actual block
 	
-	q->next_r = *p;	// 
+	q->next_r = *p;	// hash of the node in list_r with actual block hash.
 	*p = q;
 	
 	g_xdag_extstats.nwaitsync++;
