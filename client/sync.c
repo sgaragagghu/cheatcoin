@@ -45,7 +45,7 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	xdag_hash(b, sizeof(struct xdag_block), hash);
 	
 	pthread_mutex_lock(&g_sync_hash_mutex);
-		// check if block is already in list
+		// check if the needed block (to load the actual one) is already in list
 	for (p = get_list(b->field[nfield].hash), q = *p; q; q = q->next) {
 		if (!memcmp(&q->b, b, sizeof(struct xdag_block))) {
 			// refreshing the values and exit
