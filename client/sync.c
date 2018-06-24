@@ -75,12 +75,12 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	q->nfield = nfield; // field where we have the needed block to accept this block
 	q->ttl = ttl;
 	q->t = t;
-	q->next = *p;
+	q->next = *p; // the next is the needed block ..!
 	
 	*p = q;
-	p = get_list_r(hash);
+	p = get_list_r(hash); // hash of the actual block
 	
-	q->next_r = *p;
+	q->next_r = *p;	// 
 	*p = q;
 	
 	g_xdag_extstats.nwaitsync++;
