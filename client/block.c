@@ -23,6 +23,8 @@
 #include "utils/utils.h"
 #include "utils/moving_statistics/moving_average.h"
 #include "mining_common.h"
+ #include <sys/time.h>
+
 
 #define MAIN_CHAIN_PERIOD       (64 << 10)
 #define MAX_WAITING_MAIN        1
@@ -413,6 +415,18 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
 		log_block("Pretop", (b)->hash, (b)->time, (b)->storage_pos); \
 }
 
+static double gettimedouble(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_usec * 0.000001 + tv.tv_sec;
+}
+
+double time1 = 0;
+double time2 = 0;
+int modulocounter = 0;
+int16_t boundedcounter = 0;
+
+
 /* checks and adds a new block to the storage
  * returns:
  *		>0 = block was added
@@ -433,6 +447,12 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 	int verified_keys_mask = 0, err, type;
 	struct block_internal tmpNodeBlock, *blockRef, *blockRef0;
 	xdag_diff_t diff0, diff;
+
+
+double start1 = gettimedouble();
+
+
+
 
 	memset(&tmpNodeBlock, 0, sizeof(struct block_internal));
 	newBlock->field[0].transport_header = 0;
@@ -606,7 +626,19 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 	if (tmpNodeBlock.in_mask ? sum_in < sum_out : sum_out != newBlock->field[0].amount) {
 		err = 0xB;
 		goto end;
+
 	}
+
+double dt = gettimedouble() - start1;
+double start2 = gettimedouble();
+
+if(dt>0)
+	time1 =moving_average_double(time1,dt,boundedcounter); 
+if(!(modulocounter%10000)){
+	printf("mean 1: %f\n",time1);
+	fflush(stdout);
+}
+
 
 	struct block_internal *nodeBlock = xdag_malloc(sizeof(struct block_internal));
 
@@ -734,6 +766,17 @@ end:
 		sprintf(buf, "Err %2x", err & 0xff);
 		log_block(buf, tmpNodeBlock.hash, tmpNodeBlock.time, transportHeader);
 	}
+
+double dt2 = gettimedouble() - start2;
+if(dt2>0)
+        time2 =moving_average_double(time2,dt2,boundedcounter);
+if(!(modulocounter%10000)){
+        printf("mean 2: %f\n",time2);
+        fflush(stdout);
+}
+if(boundedcounter<255)
+	boundedcounter++;
+modulocounter++;
 
 	return -err;
 }
