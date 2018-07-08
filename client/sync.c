@@ -75,9 +75,12 @@ static int push_block(struct xdag_block *b, void *conn, int nfield, int ttl)
 	q->nfield = nfield; // field where we have the needed block to accept this block
 	q->ttl = ttl;
 	q->t = t;
-	q->next = *p; // the next is the needed block ..!
+	q->next = *p; // the next is the top of the list of THE HASH OF THE NEEDED BLOCK!!!! When the needed block will arrive it will unlock every(almost..) of the blocks in that list
 	
-	*p = q; // why = maybe just to initialize? setting the new first in get_list() probably!!
+	*p = q; // setting the new top in get_list() !!
+	
+	
+	
 	// setting new first in list_r
 	p = get_list_r(hash); // hash of this block BUT IN the list_r! Se 
 	
@@ -153,7 +156,7 @@ int xdag_sync_add_block(struct xdag_block *b, void *conn)
 	} else if (g_xdag_sync_on && ((res = -res) & 0xf) == 5) { // err from add_nolock is 5 (we are missing a block that have a link to the block we are trying to add)
 		res = (res >> 4) & 0xf; //taking the field of the block that failed the check (the field contain the hash of the block that we need).
 		if (push_block(b, conn, res, ttl)) { // pushing in our hash table system that we had this issue from that block from that conn
-			// we enter if the block wasn't already pushed
+			// we enter if the block wasn't already pushed or request is expired
 			struct sync_block **p, *q; //
 			uint64_t *hash = b->field[res].hash; // we get the missing block hash this way
 			time_t t = time(0); // actual time
