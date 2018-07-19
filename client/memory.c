@@ -46,6 +46,7 @@ int xdag_free_all(void)
 
 #define MEM_PORTION     	((size_t)1 << 25)
 #define TMPFILE_TEMPLATE 	"xdag-tmp-XXXXXX"
+#define CACHE_SIZE		10737418240 // Byte representation of 10GB
 
 static int g_fd = -1;
 static size_t g_pos = 0, g_fsize = 0, g_size = 0;
@@ -120,6 +121,14 @@ void *xdag_malloc(size_t size)
 
 	res = (uint8_t*)g_mem + g_pos;
 	g_pos += size;
+	
+	if(g_pos<=CACHE_SIZE){
+		mlock(g_mem, g_pos);
+	}
+	else{
+		munlock(g_mem,g_pos-CACHE_SIZE-1);
+		mlock((g_mem+g_pos)-CACHE_SIZE,CACHE_SIZE);
+	}
 	
 	pthread_mutex_unlock(&g_mem_mutex);
 	
