@@ -117,11 +117,16 @@ void *xdag_malloc(size_t size)
 		}
 		g_fsize += MEM_PORTION;
 		ftruncate(g_fd, g_fsize);
+
+		mlock(g_mem + g_fsize - MEM_PORTION, MEM_PORTION);
+		if(g_fsize >= CACHE_SIZE){
+			munlock(g_mem + g_fsize - CACHE_SIZE, MEM_PORTION);
+		}
 	}
 
 	res = (uint8_t*)g_mem + g_pos;
 	g_pos += size;
-	
+/*	
 	if(g_pos<=CACHE_SIZE){
 		mlock(g_mem, g_pos);
 	}
@@ -129,7 +134,7 @@ void *xdag_malloc(size_t size)
 		munlock(g_mem,g_pos-CACHE_SIZE-1);
 		mlock((g_mem+g_pos)-CACHE_SIZE,CACHE_SIZE);
 	}
-	
+*/	
 	pthread_mutex_unlock(&g_mem_mutex);
 	
 	return res;
