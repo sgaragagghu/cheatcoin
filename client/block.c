@@ -24,6 +24,8 @@
 #include "utils/utils.h"
 #include "utils/moving_statistics/moving_average.h"
 #include "mining_common.h"
+ #include <sys/time.h>
+
 
 #define MAIN_CHAIN_PERIOD       (64 << 10)
 #define MAX_WAITING_MAIN        1
@@ -444,6 +446,28 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
 	return -1;
 }
 
+
+static double gettimedouble(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_usec * 0.000001 + tv.tv_sec;
+}
+
+static double gettimedouble2(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_usec * 0.000001 + tv.tv_sec;
+}
+
+
+double time1 = 0;
+double time2 = 0;
+double timeall = 0;
+int modulocounter = 0;
+int16_t boundedcounter = 0;
+
+
+
 #define set_pretop(b) if ((b) && MAIN_TIME((b)->time) < MAIN_TIME(timestamp) && \
 		(!pretop_main_chain || xdag_diff_gt((b)->difficulty, pretop_main_chain->difficulty))) { \
 		pretop_main_chain = (b); \
@@ -458,6 +482,14 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
  */
 static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 {
+
+double start2=0;
+double start1=0;
+double startall=0;
+startall = gettimedouble();
+
+
+
 	const uint64_t timestamp = get_timestamp();
 	uint64_t sum_in = 0, sum_out = 0, *psum;
 	const uint64_t transportHeader = newBlock->field[0].transport_header;
@@ -653,6 +685,9 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		goto end;
 	}
 
+start1 = gettimedouble();
+
+
 	struct block_internal *nodeBlock = xdag_malloc(sizeof(struct block_internal));
 	if(!nodeBlock) {
 		err = 0xC;
@@ -712,6 +747,10 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		ourlast = nodeBlock;
 	}
 
+
+        start2 = gettimedouble();
+
+
 	for(i = 0; i < tmpNodeBlock.nlinks; ++i) {
 		remove_orphan(tmpNodeBlock.link[i], blockRef, blockRef0);
 
@@ -763,6 +802,67 @@ end:
 		sprintf(buf, "Err %2x", err & 0xff);
 		log_block(buf, tmpNodeBlock.hash, tmpNodeBlock.time, transportHeader);
 	}
+
+
+double stop = gettimedouble2();
+
+
+
+double dt = stop - start1;
+
+//if(dt>0)
+        time1 =moving_average_double(time1,dt,boundedcounter);
+if(!(modulocounter%10000)){
+        printf("mean 1: %f\n",time1);
+        fflush(stdout);
+}
+
+
+
+
+double dt2 = stop - start2;
+//if(dt2>0)
+        time2 =moving_average_double(time2,dt2,boundedcounter);
+if(!(modulocounter%10000)){
+        printf("mean 2: %f\n",time2);
+        fflush(stdout);
+}
+
+
+double dtall = stop - startall;
+//if(dt2>0)
+        timeall =moving_average_double(timeall,dtall,boundedcounter);
+        if(!(modulocounter%10000)){
+                printf("mean all: %f\n",timeall);
+                        fflush(stdout);
+                        }
+
+
+/*
+double dt = stop - start1;
+
+if(dt>0)
+        time1 =moving_average_double(time1,dt,boundedcounter);
+if(!(modulocounter%10000)){
+        printf("mean 1: %f\n",time1);
+        fflush(stdout);
+}
+*/
+
+if(boundedcounter<255)
+        boundedcounter++;
+modulocounter++;
+
+
+
+
+
+
+
+
+
+
+
 
 	return -err;
 }

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/mman.h>
 #include "memory.h"
 #include "utils/log.h"
 
@@ -44,9 +45,9 @@ int xdag_free_all(void)
 #include <sys/mman.h>
 #include <errno.h>
 
-#define MEM_PORTION     	((size_t)1 << 25)
+#define MEM_PORTION     	((size_t)1 << 27)
 #define TMPFILE_TEMPLATE 	"xdag-tmp-XXXXXX"
-#define CACHE_SIZE		10737418240 // Byte representation of 10GB
+#define CACHE_SIZE		5368709120 // Byte representation of 10GB
 
 static int g_fd = -1;
 static size_t g_pos = 0, g_fsize = 0, g_size = 0;
@@ -118,9 +119,48 @@ void *xdag_malloc(size_t size)
 		g_fsize += MEM_PORTION;
 		ftruncate(g_fd, g_fsize);
 
-		mlock(g_mem + g_fsize - MEM_PORTION, MEM_PORTION);
+
+
+ size_t i;
+ size_t page_size = getpagesize ();
+ for (i = 0; i < MEM_PORTION; i += page_size){
+  ((char*)(g_mem))[g_fsize - MEM_PORTION + i] = 0;
+                int r = mlock(g_mem + g_fsize - MEM_PORTION +i, page_size);
+                if (r){
+                        printf("(lockedERRORE %d)", r);
+                        fflush(stdout);
+                }
+                else{
+                   //     printf("(locked SUCCESS)");
+                        fflush(stdout);
+                }
+}
+
+/*
+		int r = mlock(g_mem + g_fsize - MEM_PORTION, MEM_PORTION);
+                //int r = posix_madvise(g_mem + g_fsize - MEM_PORTION, MEM_PORTION, POSIX_MADV_WILLNEED);
+
+		if (r){
+			printf("(lockedERRORE %d)", r);
+			fflush(stdout);
+		}
+		else{
+			printf("(locked SUCCESS)");
+			fflush(stdout);
+		}
+*/
 		if(g_fsize >= CACHE_SIZE){
-			munlock(g_mem + g_fsize - CACHE_SIZE, MEM_PORTION);
+			int r = munlock(g_mem + g_fsize - CACHE_SIZE, MEM_PORTION);
+              	  //int r = posix_madvise(g_mem + g_fsize - CACHE_SIZE, MEM_PORTION, POSIX_MADV_RANDOM);
+             	 	  if (r){
+               	         printf("(unlockedERRORE %d)", r);
+               	         fflush(stdout);
+               		 }
+             	  	 else{
+                //	        printf("(unlockedSUCCESS)");
+                	        fflush(stdout);
+              		  }
+
 		}
 	}
 
