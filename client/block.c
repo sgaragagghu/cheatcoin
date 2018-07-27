@@ -479,6 +479,9 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
 		log_block("Pretop", (b)->hash, (b)->time, (b)->storage_pos); \
 }
 
+xdag_hash_t fuck = {0};
+int counter =0;
+
 /* checks and adds a new block to the storage
  * returns:
  *		>0 = block was added
@@ -580,6 +583,20 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 				err = 7;
 				goto end;
 			}
+
+
+	if(!memcmp(fuck,blockRefs[i-1]->hash, sizeof(xdag_hash_t))){
+		printf("(passati %d blocchi)", counter);
+		fflush(stdout);
+		memset(fuck,0,sizeof(xdag_hash_t));
+		counter = 0;
+	}
+
+
+
+
+
+
 		}
 	}
 
@@ -766,6 +783,10 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			blockRef->backrefs->backrefs[j] = nodeBlock;
 		}
 	}
+
+counter++;
+if((fuck[0]|fuck[1]|fuck[2]|fuck[3])==0)
+memcpy(fuck,nodeBlock->hash, sizeof(xdag_hash_t));
 	
 	add_orphan(nodeBlock);
 
