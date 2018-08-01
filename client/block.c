@@ -43,7 +43,7 @@
 #define CACHE_MAX_SAMPLES	100
 #define USE_ORPHAN_HASHTABLE	1
 #define ORPHAN_HASH_SIZE	0x10000
-#define SMALL_RAM		0 // Do not use with -z RAM
+#define SMALL_RAM		1 // Do not use with -z RAM
 
 enum bi_flags {
 	BI_MAIN       = 0x01,
@@ -124,6 +124,11 @@ void add_orphan(struct block_internal*);
 void remove_orphan_hashtable(struct block_internal*, struct block_internal**, struct block_internal**);
 void add_orphan_hashtable(struct block_internal*);
 void clean_orphan_hashtable(void);
+
+
+int64_t bounded_counter = 1;
+int64_t counter[40]={0};
+
 
 
 // convert xdag_amount_t to long double
@@ -247,18 +252,22 @@ static uint64_t apply_block(struct block_internal *bi)
 	xdag_amount_t sum_in, sum_out;
 
 	if (bi->flags & BI_MAIN_REF) {
+		counter[22]++;
 		return -1l;
 	}
 
 	bi->flags |= BI_MAIN_REF;
 
 	for (int i = 0; i < bi->nlinks; ++i) {
+		counter[10]++;
 		xdag_amount_t ref_amount = apply_block(bi->link[i]);
 		if (ref_amount == -1l) {
+			counter[11]++;
 			continue;
 		}
 		bi->link[i]->ref = bi;
 		if (bi->amount + ref_amount >= bi->amount) {
+			counter[12]++;
 			accept_amount(bi, ref_amount);
 		}
 	}
@@ -266,16 +275,20 @@ static uint64_t apply_block(struct block_internal *bi)
 	sum_in = 0, sum_out = bi->fee;
 
 	for (int i = 0; i < bi->nlinks; ++i) {
+		counter[13]++;
 		if (1 << i & bi->in_mask) {
 			if (bi->link[i]->amount < bi->linkamount[i]) {
+				counter[18]++;
 				return 0;
 			}
 			if (sum_in + bi->linkamount[i] < sum_in) {
+				counter[19]++;
 				return 0;
 			}
 			sum_in += bi->linkamount[i];
 		} else {
 			if (sum_out + bi->linkamount[i] < sum_out) {
+				counter[20]++;
 				return 0;
 			}
 			sum_out += bi->linkamount[i];
@@ -283,10 +296,12 @@ static uint64_t apply_block(struct block_internal *bi)
 	}
 
 	if (sum_in + bi->amount < sum_in || sum_in + bi->amount < sum_out) {
+		counter[21]++;
 		return 0;
 	}
 
 	for (int i = 0; i < bi->nlinks; ++i) {
+counter[14]++;
 		if (1 << i & bi->in_mask) {
 			accept_amount(bi->link[i], (xdag_amount_t)0 - bi->linkamount[i]);
 		} else {
@@ -299,6 +314,23 @@ static uint64_t apply_block(struct block_internal *bi)
 
 	return bi->fee;
 }
+/*
+
+if(bounded_counter%10000){
+printf("(apply [first return %d],[first for %d],[->first if %d][->second if %d],[->else if %d],[if %d],[second for %d])",counter[22],counter[10],counter[11],counter[12],counter[20],counter[21],counter[14]);
+fflush(stdout);
+}
+
+*/
+
+
+
+
+
+
+
+
+
 
 static uint64_t unapply_block(struct block_internal *bi)
 {
@@ -308,6 +340,7 @@ static uint64_t unapply_block(struct block_internal *bi)
 		xdag_amount_t sum = bi->fee;
 
 		for (i = 0; i < bi->nlinks; ++i) {
+counter[15]++;
 			if (1 << i & bi->in_mask) {
 				accept_amount(bi->link[i], bi->linkamount[i]);
 				sum -= bi->linkamount[i];
@@ -325,13 +358,23 @@ static uint64_t unapply_block(struct block_internal *bi)
 	bi->ref = 0;
 
 	for (i = 0; i < bi->nlinks; ++i) {
+		counter[16]++;
 		if (bi->link[i]->ref == bi && bi->link[i]->flags & BI_MAIN_REF) {
+		counter[17]++;
 			accept_amount(bi, unapply_block(bi->link[i]));
 		}
 	}
 
 	return (xdag_amount_t)0 - bi->fee;
 }
+
+/*
+if(bounded_counter%10000){
+	printf("unapply [first for %d],[second for %d],[->if %d]",counter[15],counter[16],counter[17]);
+	fflush(stdout);
+}
+*/
+
 
 // calculates current supply by specified count of main blocks
 xdag_amount_t xdag_get_supply(uint64_t nmain)
@@ -381,6 +424,7 @@ static void check_new_main(void)
 	int i;
 
 	for (b = top_main_chain, i = 0; b && !(b->flags & BI_MAIN); b = b->link[b->max_diff_link]) {
+	counter[0]++;
 		if (b->flags & BI_MAIN_CHAIN) {
 			p = b;
 			++i;
@@ -388,6 +432,7 @@ static void check_new_main(void)
 	}
 
 	if (p && i > MAX_WAITING_MAIN && get_timestamp() >= p->time + 2 * 1024) {
+	counter[1]++;
 		set_main(p);
 	}
 }
@@ -395,6 +440,7 @@ static void check_new_main(void)
 static void unwind_main(struct block_internal *b)
 {
 	for (struct block_internal *t = top_main_chain; t != b; t = t->link[t->max_diff_link]) {
+		counter[5]++;
 		t->flags &= ~BI_MAIN_CHAIN;
 		if (t->flags & BI_MAIN) {
 			unset_main(t);
@@ -480,7 +526,12 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
 		pretop_main_chain = (b); \
 		log_block("Pretop", (b)->hash, (b)->time, (b)->storage_pos); \
 }
+/*
 
+int64_t bounded_counter = 1;
+int64_t counter[40]={0};
+
+*/
 /* checks and adds a new block to the storage
  * returns:
  *		>0 = block was added
@@ -587,9 +638,14 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 
 	if(!g_light_mode) {
 		check_new_main();
+
+	if(!(bounded_counter%100000)){
+		printf("(check_new_main[for %ld], [set_main %ld])", counter[0],counter[1]);
+		fflush(stdout);
 	}
 
 
+	}
 	if(signOutCount) {
 		our_keys = xdag_wallet_our_keys(&ourKeysCount);
 	}
@@ -660,6 +716,7 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 
 				while(blockRef && MAIN_TIME(blockRef->time) == MAIN_TIME(tmpNodeBlock.time)) {
 					blockRef = blockRef->link[blockRef->max_diff_link];
+					counter[3]++;
 				}
 				if(blockRef && xdag_diff_gt(xdag_diff_add(diff0, blockRef->difficulty), diff)) {
 					diff = xdag_diff_add(diff0, blockRef->difficulty);
@@ -674,6 +731,12 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			tmpNodeBlock.nlinks++;
 		}
 	}
+	
+	if(!(bounded_counter%100000)){
+		printf("(check signature [while %ld])",counter[3]);
+		fflush(stdout);
+	}
+
 
 	if(CACHE) {
 		cache_retarget(cache_hit, cache_miss);
@@ -724,14 +787,17 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			xdag_info("Diff  : %llx%016llx (+%llx%016llx)", xdag_diff_args(tmpNodeBlock.difficulty), xdag_diff_args(diff0));
 
 		for(blockRef = nodeBlock, blockRef0 = 0; blockRef && !(blockRef->flags & BI_MAIN_CHAIN); blockRef = blockRef->link[blockRef->max_diff_link]) {
+				counter[24]++;
 			if((!blockRef->link[blockRef->max_diff_link] || xdag_diff_gt(blockRef->difficulty, blockRef->link[blockRef->max_diff_link]->difficulty))
 				&& (!blockRef0 || MAIN_TIME(blockRef0->time) > MAIN_TIME(blockRef->time))) {
+				counter[4]++;
 				blockRef->flags |= BI_MAIN_CHAIN;
 				blockRef0 = blockRef;
 			}
 		}
 
 		if(blockRef && blockRef0 && blockRef != blockRef0 && MAIN_TIME(blockRef->time) == MAIN_TIME(blockRef0->time)) {
+			counter[26]++;
 			blockRef = blockRef->link[blockRef->max_diff_link];
 		}
 
@@ -740,9 +806,16 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		g_xdag_stats.difficulty = tmpNodeBlock.difficulty;
 
 		if(xdag_diff_gt(g_xdag_stats.difficulty, g_xdag_stats.max_difficulty)) {
+			counter[27]++;
 			g_xdag_stats.max_difficulty = g_xdag_stats.difficulty;
 		}
 	}
+
+if(!(bounded_counter%100000)){
+	printf("(not while for about blockref [while %ld], [->if %ld], [unwind %ld], [second if %ld], [third if %ld])",counter[24], counter[4], counter[5], counter[26], counter[27]);
+	fflush(stdout);
+}
+
 
 	if(tmpNodeBlock.flags & BI_OURS) {
 		nodeBlock->ourprev = ourlast;
@@ -751,11 +824,14 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 	}
 
 	for(i = 0; i < tmpNodeBlock.nlinks; ++i) {
+		counter[6]++;
 		remove_orphan(tmpNodeBlock.link[i], blockRef, blockRef0);
 
 		if(tmpNodeBlock.linkamount[i]) {
+			counter[7]++;
 			blockRef = tmpNodeBlock.link[i];
 			if(!blockRef->backrefs || blockRef->backrefs->backrefs[N_BACKREFS - 1]) {
+			counter[8]++;
 				struct block_backrefs *back = xdag_malloc(sizeof(struct block_backrefs));
 				if(!back) continue;
 				memset(back, 0, sizeof(struct block_backrefs));
@@ -763,12 +839,19 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 				blockRef->backrefs = back;
 			}
 
-			for(j = 0; blockRef->backrefs->backrefs[j]; ++j);
+			for(j = 0; blockRef->backrefs->backrefs[j]; ++j){
+			counter[9]++;
+}
 
 			blockRef->backrefs->backrefs[j] = nodeBlock;
 		}
 	}
 	
+if(!(bounded_counter%100000)){
+	printf("orphan [global for %ld], [first if %ld], [second if %ld], [innermost for %ld]",counter[6],counter[7],counter[8],counter[9]);
+	fflush(stdout);
+}
+
 	add_orphan(nodeBlock);
 
 	log_block((tmpNodeBlock.flags & BI_OURS ? "Good +" : "Good  "), tmpNodeBlock.hash, tmpNodeBlock.time, tmpNodeBlock.storage_pos);
@@ -792,6 +875,7 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 
 end:
 	for(j = 0; j < keysCount; ++j) {
+		counter[23]++;
 		xdag_free_key(public_keys[j].key);
 	}
 
@@ -801,6 +885,34 @@ end:
 		sprintf(buf, "Err %2x", err & 0xff);
 		log_block(buf, tmpNodeBlock.hash, tmpNodeBlock.time, transportHeader);
 	}
+
+if(!(bounded_counter%100000)){
+printf("(apply [first return %ld],[first for %ld],[->first if %ld][->second if %ld],[->else if %ld],[if %ld],[second for %ld])",counter[22],counter[10],counter[11],counter[12],counter[20],counter[21],counter[14]);
+fflush(stdout);
+}
+
+if(!(bounded_counter%100000)){
+        printf("unapply [first for %ld],[second for %ld],[->if %ld]",counter[15],counter[16],counter[17]);
+        fflush(stdout);
+}
+
+if(!(bounded_counter%100000)){
+	printf("free keys %ld", counter[23]);
+	fflush(stdout);
+}
+
+if(!(bounded_counter%100000)){
+bounded_counter=1;
+for(int h=0; h<40; h++){
+counter[h]=0;
+}
+
+printf("\n");
+fflush(stdout);
+}
+bounded_counter++;
+
+
 
 	return -err;
 }
