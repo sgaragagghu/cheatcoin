@@ -30,7 +30,7 @@ extern int xdag_rpc_service_init(int port);
 extern int xdag_rpc_service_stop(void);
 
 /* rpc white address config */
-extern int rpc_white_command(void *out, char *type, const char *address);
+int rpc_white_command(void *out, char *type, const char *address);
 
 
 	

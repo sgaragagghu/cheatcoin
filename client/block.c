@@ -1256,7 +1256,7 @@ int xdag_blocks_start(int is_pool, int mining_threads_count, int miner_address)
 		g_light_mode = 1;
 	}
 
-	if (xdag_mem_init(g_light_mode && !miner_address ? 0 : (((get_timestamp() - XDAG_ERA) >> 10) + (uint64_t)365 * 24 * 60 * 60) * 2 * sizeof(struct block_internal))) {
+	if (xdag_mem_init(g_light_mode && !miner_address ? 0 : (((get_timestamp() - XDAG_ERA) >> 8) + (uint64_t)365 * 24 * 60 * 60) * 2 * sizeof(struct block_internal))) {
 		return -1;
 	}
 
@@ -2258,21 +2258,6 @@ int add_block_nolock_triage(struct xdag_block *newBlock, xdag_time_t limit, stru
 	add_orphan(nodeBlock);
 
 	log_block((tmpNodeBlock.flags & BI_OURS ? "Good +" : "Good  "), tmpNodeBlock.hash, tmpNodeBlock.time, tmpNodeBlock.storage_pos);
-
-	i = MAIN_TIME(nodeBlock->time) & (HASHRATE_LAST_MAX_TIME - 1);
-	if(MAIN_TIME(nodeBlock->time) > MAIN_TIME(g_xdag_extstats.hashrate_last_time)) {
-		memset(g_xdag_extstats.hashrate_total + i, 0, sizeof(xdag_diff_t));
-		memset(g_xdag_extstats.hashrate_ours + i, 0, sizeof(xdag_diff_t));
-		g_xdag_extstats.hashrate_last_time = nodeBlock->time;
-	}
-
-	if(xdag_diff_gt(diff0, g_xdag_extstats.hashrate_total[i])) {
-		g_xdag_extstats.hashrate_total[i] = diff0;
-	}
-
-	if(tmpNodeBlock.flags & BI_OURS && xdag_diff_gt(diff0, g_xdag_extstats.hashrate_ours[i])) {
-		g_xdag_extstats.hashrate_ours[i] = diff0;
-	}
 
 	err = -1;
 
