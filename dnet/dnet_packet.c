@@ -94,7 +94,7 @@ void *dnet_send_xdag_packet(void *block, void *connection_to) {
 	if (d.nconn > 0) dnet_send_packet(d.p, d.conn);
 	return (d.nconn > 0 && d.nconn < INT_MAX ? d.conn : 0);
 }
-
+/*
 int dnet_send_command_packet(struct dnet_packet_stream *st, struct dnet_output *output) {
     int i;
 	if (!g_last_sent_command) {
@@ -110,7 +110,7 @@ int dnet_send_command_packet(struct dnet_packet_stream *st, struct dnet_output *
     }
     return 5;
 }
-
+*/
 int dnet_cancel_command(struct dnet_output *output) {
     int i;
 	if (g_last_sent_command) for (i = 0; i < SENT_COMMANDS_MAX; ++i) if (g_last_sent_command[i].valid

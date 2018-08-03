@@ -11,7 +11,6 @@
 #endif
 #include "dnet_database.h"
 #include "dnet_connection.h"
-#include "dnet_stream.h"
 #include "dnet_log.h"
 #include "../client/utils/utils.h"
 
@@ -105,7 +104,7 @@ int dnet_print_connections(struct dnet_output *out) {
     if (out == &new_out) dnet_log_close(out);
     return count;
 }
-
+/*
 void dnet_print_streams(struct dnet_output *out) {
     struct dnet_output new_out;
     if (!out) dnet_log_open(out = &new_out);
@@ -114,7 +113,7 @@ void dnet_print_streams(struct dnet_output *out) {
     dnet_traverse_streams((int (*)(struct dnet_stream *, void *))&dnet_print_stream, out);
     if (out == &new_out) dnet_log_close(out);
 }
-
+*/
 void dnet_log_periodic(void) {
 #ifndef QDNET
     time_t t = time(0);
@@ -124,7 +123,7 @@ void dnet_log_periodic(void) {
 			dnet_print_hosts(0, 0);
 			dnet_print_connections(0);
 		}
-        dnet_print_streams(0);
+        //dnet_print_streams(0);
     }
 #endif
 }

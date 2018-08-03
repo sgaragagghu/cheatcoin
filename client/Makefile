@@ -47,7 +47,6 @@ sources = 							\
 	$(dnet)/dnet_main.c						\
 	$(dnet)/dnet_threads.c					\
 	$(dnet)/dnet_connection.c				\
-	$(dnet)/dnet_stream.c					\
 	$(dnet)/dnet_packet.c					\
 	$(dnet)/dnet_command.c					\
 	$(dnet)/dnet_log.c						\
@@ -98,7 +97,6 @@ headers = 							\
 	$(dnet)/dnet_history.h					\
 	$(dnet)/dnet_threads.h					\
 	$(dnet)/dnet_connection.h				\
-	$(dnet)/dnet_stream.h					\
 	$(dnet)/dnet_packet.h					\
 	$(dnet)/dnet_command.h					\
 	$(dnet)/dnet_log.h						\

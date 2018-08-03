@@ -19,7 +19,6 @@
 #include "dnet_packet.h"
 #include "dnet_database.h"
 #include "dnet_log.h"
-#include "dnet_stream.h"
 
 #define CONNECTIONS_MAX	    100
 #define MAX_N_INBOUND		CONNECTIONS_MAX
@@ -112,7 +111,7 @@ static void dnet_thread_work(struct dnet_thread *t)
 		// immediately at program termination.
 		setsockopt(t->conn.socket, SOL_SOCKET, SO_LINGER, (char *)&linger_opt, sizeof(linger_opt));
 		setsockopt(t->conn.socket, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr, sizeof(int));
-
+/*
 		if (proto == DNET_UDP) {
 			if (t->type != DNET_THREAD_STREAM) {
 				dnet_generate_stream_id(&t->st.id);
@@ -126,7 +125,7 @@ static void dnet_thread_work(struct dnet_thread *t)
 			dnet_thread_stream(t);
 			return;
 		}
-
+*/
 		// Now, listen for a connection
 		res = listen(t->conn.socket, CONNECTIONS_MAX);    // "1" is the maximal length of the queue
 		if (res) {
@@ -188,12 +187,12 @@ begin:
 			goto err;
 		}
 
-		if (t->type == DNET_THREAD_STREAM) {
+	/*	if (t->type == DNET_THREAD_STREAM) {
 			t->st.ip_to = ip_to;
 			t->st.port_to = port_to;
 			t->st.input_tty = t->st.output_tty = t->conn.socket;
 			dnet_thread_stream(t);
-		} else {
+		} else*/ {
 			res = dnet_connection_main(&t->conn);
 			if (res) {
 				mess = "connection error"; 
@@ -437,9 +436,9 @@ int dnet_thread_create(struct dnet_thread *t)
 	case DNET_THREAD_ACCEPTED:
 		run = &dnet_thread_accepted;
 		break;
-	case DNET_THREAD_STREAM:
+/*	case DNET_THREAD_STREAM:
 		run = &dnet_thread_stream;
-		break;
+		break;*/
 	case DNET_THREAD_EXCHANGER:
 		run = &dnet_thread_exchanger;
 		break;

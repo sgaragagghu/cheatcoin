@@ -137,9 +137,14 @@ int dnet_init(int argc, char **argv) {
 			thread->conn.socket = -1;
 			thread->type = (is_server ? DNET_THREAD_SERVER : DNET_THREAD_CLIENT);
 		} else if (i == argc) {
+			printf("WATCHDOG");
+			fflush(stdout);
 			thread->type = DNET_THREAD_WATCHDOG;
 		} else {
+			printf("COLLECTOR");
+			fflush(stdout);
 			thread->type = DNET_THREAD_COLLECTOR;
+			
 		}
 		res = dnet_thread_create(thread);
 		if (res) { err = 3; goto end; }
