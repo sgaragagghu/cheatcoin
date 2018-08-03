@@ -52,7 +52,6 @@ sources = 							\
 	$(dnet)/dnet_command.c					\
 	$(dnet)/dnet_log.c						\
 	$(dnet)/dnet_files.c					\
-	$(dnet)/dnet_tap.c						\
 	$(dfslib)/dfslib_crypt.c				\
 	$(dfslib)/dfslib_random.c				\
 	$(dfslib)/dfslib_string.c				\
@@ -104,7 +103,6 @@ headers = 							\
 	$(dnet)/dnet_command.h					\
 	$(dnet)/dnet_log.h						\
 	$(dnet)/dnet_files.h					\
-	$(dnet)/dnet_tap.h						\
 	$(dnet)/dthread.h						\
 	$(dfslib)/dfslib_crypt.h				\
 	$(dfslib)/dfslib_random.h				\

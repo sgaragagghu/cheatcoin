@@ -28,7 +28,6 @@
 #include "dnet_database.h"
 #include "dnet_connection.h"
 #include "dnet_files.h"
-#include "dnet_tap.h"
 
 #define DNET_FORWARD_WAIT 3 /* сколько секунд ждать соединения при проброске порта */
 
