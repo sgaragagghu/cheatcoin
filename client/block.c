@@ -43,7 +43,7 @@
 #define CACHE_MAX_SAMPLES	100
 #define USE_ORPHAN_HASHTABLE	1
 #define ORPHAN_HASH_SIZE	0x10000
-#define SMALL_RAM		0 // Do not use with -z RAM
+#define SMALL_RAM		1 // Do not use with -z RAM
 
 enum bi_flags {
 	BI_MAIN       = 0x01,
@@ -87,6 +87,8 @@ struct cache_block {
 	xdag_hash_t hash;
 	struct xdag_block block;
 	struct cache_block *next;
+	struct block_internal bi;
+	struct block_internal *bi_ptr;
 };
 
 struct orphan_block {
@@ -115,7 +117,7 @@ static struct orphan_block *g_orphan_first = NULL, *g_orphan_last = NULL;
 
 //functions
 void cache_retarget(int32_t, int32_t);
-void cache_add(struct xdag_block*, xdag_hash_t);
+void cache_add(struct xdag_block*, xdag_hash_t, struct block_internal*);
 int32_t check_signature_out_cached(struct block_internal*, struct xdag_public_key*, const int, int32_t*, int32_t*);
 int32_t check_signature_out(struct block_internal*, struct xdag_public_key*, const int);
 static int32_t find_and_verify_signature_out(struct xdag_block*, struct xdag_public_key*, const int);
@@ -475,6 +477,12 @@ static int valid_signature(const struct xdag_block *b, int signo_r, int keysLeng
 	return -1;
 }
 
+
+int64_t bounded_counter = 1;
+int64_t first = 0;
+int64_t second = 0;
+
+
 #define set_pretop(b) if ((b) && MAIN_TIME((b)->time) < MAIN_TIME(timestamp) && \
 		(!pretop_main_chain || xdag_diff_gt((b)->difficulty, pretop_main_chain->difficulty))) { \
 		pretop_main_chain = (b); \
@@ -501,6 +509,7 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 	int verified_keys_mask = 0, err, type;
 	struct block_internal tmpNodeBlock, *blockRef = NULL, *blockRef0 = NULL;
 	struct block_internal* blockRefs[XDAG_BLOCK_FIELDS-1]= {0};
+	struct block_internal* bi_ptr[XDAG_BLOCK_FIELDS-1] = {0} ;
 	xdag_diff_t diff0, diff;
 	int32_t cache_hit = 0, cache_miss = 0;
 
@@ -569,15 +578,30 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 
 	for(i = 1; i < XDAG_BLOCK_FIELDS; ++i) {
 		if(1 << i & (inmask | outmask)) {
-			blockRefs[i-1] = block_by_hash(newBlock->field[i].hash);
+			struct cache_block *cb = NULL;
+			if((cb=cache_block_by_hash(newBlock->field[i].hash))!=NULL){
+				
+				cache_hit++;
+				blockRefs[i-1]=&(cb->bi);
+				bi_ptr[i-1]=cb->bi_ptr;
+			}
+			else{
+				blockRefs[i-1] = block_by_hash(newBlock->field[i].hash);
+				cache_miss++;
+			}
 			if(!blockRefs[i-1]) {
 				err = 5;
 				goto end;
 			}
+			//printf("ARRIVATO1");
+			//fflush(stdout);
 			if(blockRefs[i-1]->time >= tmpNodeBlock.time) {
 				err = 6;
 				goto end;
 			}
+			  //                      printf("ARRIVATO2");
+                        //fflush(stdout);
+
 			if(tmpNodeBlock.nlinks >= MAX_LINKS) {
 				err = 7;
 				goto end;
@@ -626,16 +650,26 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			blockRef = blockRefs[i-1];
 			if(1 << i & inmask) {
 				if(newBlock->field[i].amount) {
+                        //printf("ARRIVATO4");
+                        //fflush(stdout);
+
 					int32_t res = 1;
 					if(CACHE) {
 						res = check_signature_out_cached(blockRef, public_keys, keysCount, &cache_hit, &cache_miss);
+                        //printf("ARRIVATO5");
+                        //fflush(stdout);
+
 					} else {
 						res = check_signature_out(blockRef, public_keys, keysCount);
+                        //printf("ARRIVATO6");
+                        //fflush(stdout);
+
 					}
 					if(res) {
 						err = res;
 						goto end;
 					}
+
 
 				}
 				psum = &sum_in;
@@ -650,20 +684,39 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 			}
 
 			*psum += newBlock->field[i].amount;
-			tmpNodeBlock.link[tmpNodeBlock.nlinks] = blockRef;
+			if(CACHE && bi_ptr[i-1]!= NULL)
+				tmpNodeBlock.link[tmpNodeBlock.nlinks] = bi_ptr[i-1];
+			else
+                                tmpNodeBlock.link[tmpNodeBlock.nlinks] = blockRef;
 			tmpNodeBlock.linkamount[tmpNodeBlock.nlinks] = newBlock->field[i].amount;
+                        //printf("ARRIVATO7");
+                        //fflush(stdout);
 
 			if(MAIN_TIME(blockRef->time) < MAIN_TIME(tmpNodeBlock.time)) {
+				first++;
 				diff = xdag_diff_add(diff0, blockRef->difficulty);
+		          //              printf("ARRIVATO8");
+                        //fflush(stdout);
+
 			} else {
+				second++;
 				diff = blockRef->difficulty;
+                        //printf("ARRIVATO9");
+                        //fflush(stdout);
+
 
 				while(blockRef && MAIN_TIME(blockRef->time) == MAIN_TIME(tmpNodeBlock.time)) {
 					blockRef = blockRef->link[blockRef->max_diff_link];
 				}
+                        //printf("ARRIVATO10");
+                        //fflush(stdout);
+
 				if(blockRef && xdag_diff_gt(xdag_diff_add(diff0, blockRef->difficulty), diff)) {
 					diff = xdag_diff_add(diff0, blockRef->difficulty);
 				}
+                        //printf("ARRIVATO11");
+                        //fflush(stdout);
+
 			}
 
 			if(xdag_diff_gt(diff, tmpNodeBlock.difficulty)) {
@@ -675,6 +728,16 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		}
 	}
 
+if(!(bounded_counter%10000)){
+//printf("ratio first : %f second : %f", (float)(((float)first)/(float)(first+second)), (float)(((float)second)/(float)(first+second)));
+
+//fflush(stdout);
+bounded_counter=1;
+first=0;
+second=0;
+}
+
+bounded_counter++;
 	if(CACHE) {
 		cache_retarget(cache_hit, cache_miss);
 	}
@@ -689,11 +752,11 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		err = 0xC;
 		goto end;
 	}
-
-	if(CACHE && signOutCount) {
+/*
+	if(CACHE) {
 		cache_add(newBlock, tmpNodeBlock.hash);
 	}
-
+*/
 	if(!(transportHeader & (sizeof(struct xdag_block) - 1))) {
 		tmpNodeBlock.storage_pos = transportHeader;
 	} else {
@@ -709,11 +772,18 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 #else
 	ldus_rbtree_insert(&root, &nodeBlock->node);
 #endif
+
+        if(CACHE) {
+                cache_add(newBlock, tmpNodeBlock.hash, nodeBlock);
+        }
+
 	g_xdag_stats.nblocks++;
 
 	if(g_xdag_stats.nblocks > g_xdag_stats.total_nblocks) {
 		g_xdag_stats.total_nblocks = g_xdag_stats.nblocks;
 	}
+                //        printf("ARRIVATO12");
+                 //       fflush(stdout);
 
 	set_pretop(nodeBlock);
 	set_pretop(top_main_chain);
@@ -749,9 +819,16 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 		*(ourlast ? &ourlast->ournext : &ourfirst) = nodeBlock;
 		ourlast = nodeBlock;
 	}
+                   //     printf("ARRIVATO13");
+                   //     fflush(stdout);
 
 	for(i = 0; i < tmpNodeBlock.nlinks; ++i) {
+                    //    printf("ARRIVATO14");
+                    //    fflush(stdout);
+
 		remove_orphan(tmpNodeBlock.link[i], blockRef, blockRef0);
+                     //   printf("ARRIVATO15");
+                     //   fflush(stdout);
 
 		if(tmpNodeBlock.linkamount[i]) {
 			blockRef = tmpNodeBlock.link[i];
@@ -770,6 +847,8 @@ static int add_block_nolock(struct xdag_block *newBlock, xdag_time_t limit)
 	}
 	
 	add_orphan(nodeBlock);
+                     //   printf("ARRIVATO16");
+                     //   fflush(stdout);
 
 	log_block((tmpNodeBlock.flags & BI_OURS ? "Good +" : "Good  "), tmpNodeBlock.hash, tmpNodeBlock.time, tmpNodeBlock.storage_pos);
 
@@ -1676,9 +1755,9 @@ void xdag_list_mined_blocks(int count, int include_non_payed, FILE *out)
 void cache_retarget(int32_t cache_hit, int32_t cache_miss)
 {
 	if(g_xdag_extstats.cache_usage >= g_xdag_extstats.cache_size) {
-		if(g_xdag_extstats.cache_hitrate < 0.94 && g_xdag_extstats.cache_size < CACHE_MAX_SIZE) {
+		if(g_xdag_extstats.cache_hitrate < 0.54 && g_xdag_extstats.cache_size < CACHE_MAX_SIZE) {
 			g_xdag_extstats.cache_size++;
-		} else if(g_xdag_extstats.cache_hitrate > 0.98 && !cache_miss && g_xdag_extstats.cache_size) {
+		} else if(g_xdag_extstats.cache_hitrate > 0.58 && !cache_miss && g_xdag_extstats.cache_size && (((float)rand()/(float)RAND_MAX)>0.85)) {
 			g_xdag_extstats.cache_size--;
 		}
 		for(int l = g_xdag_extstats.cache_usage; l > g_xdag_extstats.cache_size; l--) {
@@ -1697,7 +1776,7 @@ void cache_retarget(int32_t cache_hit, int32_t cache_miss)
 			}
 		}
 
-	} else if(g_xdag_extstats.cache_hitrate > 0.98 && !cache_miss && g_xdag_extstats.cache_size) {
+	} else if(g_xdag_extstats.cache_hitrate > 0.58 && !cache_miss && g_xdag_extstats.cache_size &&  (((float)rand()/(float)RAND_MAX)>0.85)) {
 		g_xdag_extstats.cache_size--;
 	}
 	if((uint32_t)(g_xdag_extstats.cache_size / 0.9) > CACHE_MAX_SIZE) {
@@ -1711,7 +1790,7 @@ void cache_retarget(int32_t cache_hit, int32_t cache_miss)
 	}
 }
 
-void cache_add(struct xdag_block* block, xdag_hash_t hash)
+void cache_add(struct xdag_block* block, xdag_hash_t hash, struct block_internal *nodeBlock)
 {
 	if(g_xdag_extstats.cache_usage <= CACHE_MAX_SIZE) {
 		struct cache_block *cacheBlock = malloc(sizeof(struct cache_block));
@@ -1719,6 +1798,8 @@ void cache_add(struct xdag_block* block, xdag_hash_t hash)
 			memset(cacheBlock, 0, sizeof(struct cache_block));
 			memcpy(&(cacheBlock->block), block, sizeof(struct xdag_block));
 			memcpy(&(cacheBlock->hash), hash, sizeof(xdag_hash_t));
+			memcpy(&(cacheBlock->bi), nodeBlock, sizeof(struct block_internal));
+			cacheBlock->bi_ptr = nodeBlock;
 
 			if(cache_first == NULL)
 				cache_first = cacheBlock;
@@ -1740,10 +1821,10 @@ int32_t check_signature_out_cached(struct block_internal* blockRef, struct xdag_
 {
 	struct cache_block *bref = cache_block_by_hash(blockRef->hash);
 	if(bref != NULL) {
-		++(*cache_hit);
+		//++(*cache_hit);
 		return  find_and_verify_signature_out(&(bref->block), public_keys, keysCount);
 	} else {
-		++(*cache_miss);
+		//++(*cache_miss);
 		return check_signature_out(blockRef, public_keys, keysCount);
 	}
 }
