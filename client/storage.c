@@ -502,7 +502,7 @@ uint64_t xdag_load_blocks(xdag_time_t start_time, xdag_time_t end_time, void *da
 
 	buf = malloc(bufsize*sizeof(struct xdag_block));
  	if(buf == NULL){
-		xdag_fat("malloc failed [function xdag_load_blocks]");
+		xdag_fatal("malloc failed [function xdag_load_blocks]");
 		return 0;
 	}
 
