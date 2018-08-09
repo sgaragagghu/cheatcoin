@@ -43,7 +43,7 @@
 #define CACHE_MAX_SAMPLES	100
 #define USE_ORPHAN_HASHTABLE	1
 #define ORPHAN_HASH_SIZE	0x10000
-#define SMALL_RAM		0 // Do not use with -z RAM
+#define SMALL_RAM		1
 
 enum bi_flags {
 	BI_MAIN       = 0x01,
